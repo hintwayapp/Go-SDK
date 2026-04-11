@@ -106,7 +106,6 @@ func (m *AnalyticsManager) vortexLog(format string, args ...any) {
 	log.Printf("[Vortex] %s\n", msg)
 }
 
-// Init configures and starts the SDK
 func (m *AnalyticsManager) Init(tenantID, serverURL, platform, appVersion string, autoBatching bool, flushIntervalSec int) {
 	m.mu.Lock()
 	if m.initialized {
