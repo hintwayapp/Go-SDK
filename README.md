@@ -1,6 +1,6 @@
-# Vortex Analytics - Go SDK
+# Hintway - Go SDK
 
-For documentation, visit [documentation.vortexanalytics.io](https://documentation.vortexanalytics.io/).
+For documentation, visit [documentation.hintway.app](https://documentation.hintway.app/).
 
 ## License
 

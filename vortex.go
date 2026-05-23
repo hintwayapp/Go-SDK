@@ -81,7 +81,7 @@ var (
 func Instance() *AnalyticsManager {
 	once.Do(func() {
 		instance = &AnalyticsManager{
-			serverURL:           "https://in.vortexanalytics.io",
+			serverURL:           "https://in.hintway.app",
 			autoFlushInterval:   10 * time.Second,
 			internalQueue:       make([]Tracking, 0),
 			manualBatchedTracks: make([]Tracking, 0),
@@ -98,12 +98,12 @@ func (m *AnalyticsManager) SetVerbose(verbose bool) {
 	m.verbose = verbose
 }
 
-func (m *AnalyticsManager) vortexLog(format string, args ...any) {
+func (m *AnalyticsManager) hintwayLog(format string, args ...any) {
 	if !m.verbose {
 		return
 	}
 	msg := fmt.Sprintf(format, args...)
-	log.Printf("[Vortex] %s\n", msg)
+	log.Printf("[Hintway] %s\n", msg)
 }
 
 func (m *AnalyticsManager) Init(tenantID, serverURL, platform, appVersion string, autoBatching bool, flushIntervalSec int) {
@@ -130,11 +130,11 @@ func (m *AnalyticsManager) Init(tenantID, serverURL, platform, appVersion string
 	m.initialized = true
 	m.mu.Unlock()
 
-	m.vortexLog("Init called: tenantId=%s, url=%s, platform=%s, appVersion=%s, autoBatching=%v, flushIntervalSec=%d",
+	m.hintwayLog("Init called: tenantId=%s, url=%s, platform=%s, appVersion=%s, autoBatching=%v, flushIntervalSec=%d",
 		tenantID, serverURL, platform, appVersion, autoBatching, flushIntervalSec)
 
 	m.initSession()
-	m.vortexLog("AnalyticsManager initialized")
+	m.hintwayLog("AnalyticsManager initialized")
 
 	go m.checkServerAvailabilityAsync()
 
@@ -144,7 +144,7 @@ func (m *AnalyticsManager) Init(tenantID, serverURL, platform, appVersion string
 func (m *AnalyticsManager) initSession() {
 	m.identity = m.getPersistentIdentity()
 	m.sessionID = generateUUID()
-	m.vortexLog("Session initialized - Identity: %s, SessionId: %s, AppVersion: %s", m.identity, m.sessionID, m.appVersion)
+	m.hintwayLog("Session initialized - Identity: %s, SessionId: %s, AppVersion: %s", m.identity, m.sessionID, m.appVersion)
 }
 
 func (m *AnalyticsManager) getPersistentIdentity() string {
@@ -159,15 +159,15 @@ func (m *AnalyticsManager) getPersistentIdentity() string {
 
 	if data, err := os.ReadFile(path); err == nil && len(data) > 0 {
 		id := string(data)
-		m.vortexLog("Loaded persistent identity: %s", id)
+		m.hintwayLog("Loaded persistent identity: %s", id)
 		return id
 	}
 
 	newID := generateUUID()
 	if err := os.WriteFile(path, []byte(newID), 0644); err != nil {
-		m.vortexLog("Failed to write persistent identity: %v", err)
+		m.hintwayLog("Failed to write persistent identity: %v", err)
 	} else {
-		m.vortexLog("Generated new persistent identity: %s", newID)
+		m.hintwayLog("Generated new persistent identity: %s", newID)
 	}
 
 	return newID
@@ -204,7 +204,7 @@ func (m *AnalyticsManager) checkServerAvailabilityAsync() {
 		return
 	}
 
-	m.vortexLog("Validating tenant at %s/validate?tenant_id=%s", m.serverURL, m.tenantID)
+	m.hintwayLog("Validating tenant at %s/validate?tenant_id=%s", m.serverURL, m.tenantID)
 
 	ctx, cancel := context.WithTimeout(m.cancelCtx, 5*time.Second)
 	defer cancel()
@@ -217,14 +217,14 @@ func (m *AnalyticsManager) checkServerAvailabilityAsync() {
 	m.mu.Lock()
 	if err == nil && resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		m.serverAlive = true
-		m.vortexLog("Tenant validation succeeded - tenant_id is valid")
+		m.hintwayLog("Tenant validation succeeded - tenant_id is valid")
 	} else {
 		m.serverAlive = false
 		if err != nil {
-			m.vortexLog("Tenant validation request failed (server unreachable): %v", err)
+			m.hintwayLog("Tenant validation request failed (server unreachable): %v", err)
 		} else {
 			body, _ := io.ReadAll(resp.Body)
-			m.vortexLog("Tenant validation failed - HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+			m.hintwayLog("Tenant validation failed - HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 		}
 	}
 	if resp != nil {
@@ -248,33 +248,33 @@ func (m *AnalyticsManager) checkServerAvailabilityAsync() {
 func (m *AnalyticsManager) sendRequest(ctx context.Context, endpoint string, data any) bool {
 	jsonData, err := json.Marshal(data)
 	if err != nil {
-		m.vortexLog("JSON serialization error: %v", err)
+		m.hintwayLog("JSON serialization error: %v", err)
 		return false
 	}
 
-	m.vortexLog("Sending POST to %s%s with body: %s", m.serverURL, endpoint, string(jsonData))
+	m.hintwayLog("Sending POST to %s%s with body: %s", m.serverURL, endpoint, string(jsonData))
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, m.serverURL+endpoint, bytes.NewBuffer(jsonData))
 	if err != nil {
-		m.vortexLog("Failed to create request: %v", err)
+		m.hintwayLog("Failed to create request: %v", err)
 		return false
 	}
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := m.httpClient.Do(req)
 	if err != nil {
-		m.vortexLog("Request exception: %v", err)
+		m.hintwayLog("Request exception: %v", err)
 		return false
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		m.vortexLog("Request succeeded: %s%s", m.serverURL, endpoint)
+		m.hintwayLog("Request succeeded: %s%s", m.serverURL, endpoint)
 		return true
 	}
 
 	body, _ := io.ReadAll(resp.Body)
-	m.vortexLog("Request failed: %s%s\nResponse code: %d\nResponse body: %s", m.serverURL, endpoint, resp.StatusCode, string(body))
+	m.hintwayLog("Request failed: %s%s\nResponse code: %d\nResponse body: %s", m.serverURL, endpoint, resp.StatusCode, string(body))
 	return false
 }
 
@@ -312,7 +312,7 @@ func (m *AnalyticsManager) flushInternalQueueAsync() {
 	m.mu.Unlock()
 
 	batch := BatchedTracks{Tracks: toSend}
-	m.vortexLog("Flushing internal queue with %d events", len(batch.Tracks))
+	m.hintwayLog("Flushing internal queue with %d events", len(batch.Tracks))
 	m.sendRequest(context.Background(), "/batch", batch)
 }
 
@@ -330,7 +330,7 @@ func (m *AnalyticsManager) FlushManualBatch() {
 		m.mu.Unlock()
 
 		batchToSend := BatchedTracks{Tracks: toSend}
-		m.vortexLog("Posting manual batch with %d events", len(batchToSend.Tracks))
+		m.hintwayLog("Posting manual batch with %d events", len(batchToSend.Tracks))
 		m.sendRequest(context.Background(), "/batch", batchToSend)
 	}()
 }
@@ -386,14 +386,14 @@ func (m *AnalyticsManager) TrackEvent(eventName string, props any) {
 
 func (m *AnalyticsManager) processTrackEvent(eventName, value string) {
 	t := m.createTracking(eventName, value)
-	m.vortexLog("TrackEvent: %s value: %s", eventName, value)
+	m.hintwayLog("TrackEvent: %s value: %s", eventName, value)
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	if !m.isServerChecked || m.autoBatching {
 		m.internalQueue = append(m.internalQueue, t)
-		m.vortexLog("Event queued internally. Queue size: %d", len(m.internalQueue))
+		m.hintwayLog("Event queued internally. Queue size: %d", len(m.internalQueue))
 	} else {
 		// Non-blocking fire-and-forget
 		go m.sendRequest(context.Background(), "/track", t)
@@ -423,7 +423,7 @@ func (m *AnalyticsManager) BatchedTrackEvent(eventName string, props any) {
 
 	m.mu.Lock()
 	m.manualBatchedTracks = append(m.manualBatchedTracks, tracking)
-	m.vortexLog("BatchedTrackEvent: %s added to manual batch. Batch size: %d", eventName, len(m.manualBatchedTracks))
+	m.hintwayLog("BatchedTrackEvent: %s added to manual batch. Batch size: %d", eventName, len(m.manualBatchedTracks))
 	m.mu.Unlock()
 }
 
@@ -453,7 +453,7 @@ func (m *AnalyticsManager) Shutdown() {
 	m.mu.Unlock()
 
 	if len(tracksToSend) > 0 {
-		m.vortexLog("Attempting final flush before exit with %d events", len(tracksToSend))
+		m.hintwayLog("Attempting final flush before exit with %d events", len(tracksToSend))
 		batch := BatchedTracks{Tracks: tracksToSend}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)

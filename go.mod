@@ -1,3 +1,3 @@
-module github.com/vortex-analytics-io/go-sdk
+module github.com/hintwayapp/go-sdk
 
 go 1.26.2
